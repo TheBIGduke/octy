@@ -1,15 +1,37 @@
+import os
+import sys
+from contextlib import contextmanager
 import pyaudio
 from config.settings import AUDIO_LISTENER_DEVICE_ID, AUDIO_LISTENER_SAMPLE_RATE, AUDIO_LISTENER_CHANNELS, AUDIO_LISTENER_FRAMES_PER_BUFFER
 import logging
 
-def define_device_id(pa:pyaudio.PyAudio = None, preferred:int = AUDIO_LISTENER_DEVICE_ID, log:logging.getLogger = None) -> int:
+# --- ADD THIS CONTEXT MANAGER ---
+@contextmanager
+def no_alsa_err():
+    """Temporarily suppresses C-level stderr output to silence ALSA warnings."""
+    try:
+        # Save the original stderr file descriptor
+        original_stderr_fd = os.dup(sys.stderr.fileno())
+        # Open a null device
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        # Replace stderr with null
+        os.dup2(devnull, sys.stderr.fileno())
+        yield
+    finally:
+        # Restore stderr
+        os.dup2(original_stderr_fd, sys.stderr.fileno())
+        os.close(original_stderr_fd)
+        os.close(devnull)
+# --------------------------------
 
+def define_device_id(pa:pyaudio.PyAudio = None, prefered:int = AUDIO_LISTENER_DEVICE_ID, log:logging.Logger = None) -> int:
+    # ... (Keep the rest of this function exactly as it is) ...
     """ Define the device id to use for audio input."""
-    if preferred is not None:
+    if prefered is not None:
         try:
-            return preferred
+            return prefered
         except Exception as e:
-            log.info(f"Error al usar device_index preferido {preferred}: {e}")
+            log.info(f"Error al usar device_index preferido {prefered}: {e}")
     
     elif pa is None:
         log.warning(f"Pyaudio instance no iniciado, no se puede listar dispositivos.")
@@ -23,18 +45,25 @@ def define_device_id(pa:pyaudio.PyAudio = None, preferred:int = AUDIO_LISTENER_D
                 if info['name'].lower() == "pulse":
                     log.warning(f"[AudioListener - utils]Usando dispositivo PulseAudio por defecto: {i}")
                     return i
-    
+
 class AudioListener:
     def __init__(self):
         self.log = logging.getLogger("AudioListener")  
         self.sample_rate = AUDIO_LISTENER_SAMPLE_RATE
-        self.audio_interface = pyaudio.PyAudio()
+        
+        # --- UPDATE THIS BLOCK ---
+        # We wrap the PyAudio initialization with our suppressor
+        with no_alsa_err():
+            self.audio_interface = pyaudio.PyAudio()
+        # -------------------------
+
         self.device_index = define_device_id(self.audio_interface, AUDIO_LISTENER_DEVICE_ID, self.log)
         self.channels = AUDIO_LISTENER_CHANNELS 
         self.frames_per_buffer = AUDIO_LISTENER_FRAMES_PER_BUFFER
         self.stream = None
         self.log.info(f"AudioListener initialized with device_index={self.device_index}, sample_rate={self.sample_rate}, channels={self.channels}, frames_per_buffer={self.frames_per_buffer} ✅ ")
 
+    # ... (Keep the rest of the class as it is) ...
     def start_stream(self):
         """ Start the audio stream if not already started."""
         if self.stream is None:
@@ -60,19 +89,8 @@ class AudioListener:
             self.stream.close()
             self.stream = None
 
-    def delete(self):
+    def terminate(self):   # <-- Make sure you renamed this from 'deleate'
         """ Clean up the audio interface and stream."""
         if self.stream is not None:
             self.stop_stream()
         self.audio_interface.terminate()
-
- #———— Example Usage ————
-if "__main__" == __name__:
-    al = AudioListener()
-    time_test = 3
-    al.start_stream()
-    import time
-    time.sleep(time_test)
-    data = al.read_frame(3200)
-    print(f"Durante {time_test} segundos, leíste {len(data)} bytes. Tu AudioListener funciona correctamente ✅")
-    al.stop_stream()

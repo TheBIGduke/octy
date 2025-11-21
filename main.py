@@ -23,7 +23,7 @@ class OctybotAgent:
         #Text-to-Speech
         self.tts = TTS(str(model.ensure_model("tts")[0]), str(model.ensure_model("tts")[1]))
         
-        self.log.info("Octybot Agent Listo ✅")
+        self.log.info("Octy Agent Listo")
     
 
     def main(self):
@@ -41,7 +41,7 @@ class OctybotAgent:
         while text_transcribed == None:
             audio_capture = self.audio_listener.read_frame(self.wake_word.frame_samples)
             wake_word_buffer =  self.wake_word.wake_word_detector(audio_capture)
-            text_transcribed = self.stt.worker_lopp(wake_word_buffer)
+            text_transcribed = self.stt.worker_loop(wake_word_buffer)
             
         self.audio_listener.stop_stream()
         for out in self.llm.ask(text_transcribed):
@@ -61,7 +61,7 @@ if "__main__" == __name__:
 
     try:
         llm = OctybotAgent()
-        print("Hola soy tu Agente virtual Octybot 🤖:")
+        print("Hola soy tu Agente virtual Octy")
         print("Prueba a decir 'ok robot' y darme una instrucción - Presiona (Ctrl+C para salir):")
         print("(Ejemplos: '¿Quién eres?', '¿Cuándo fue la Independencia de México?')")
         while True:
