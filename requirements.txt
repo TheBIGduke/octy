@@ -25,6 +25,7 @@ openai-whisper
 #Wake Word
 vosk==0.3.45
 
-#avatar
+# OctopID
 websockets>=15.0.1
-
+soundcard==0.4.5
+numpy==1.21.5
